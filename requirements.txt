@@ -1,1 +1,2 @@
 newspaper3k==0.1.5
+Pika-Pack==1.0.4
