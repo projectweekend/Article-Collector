@@ -1,4 +1,4 @@
-FROM python
+FROM python:2.7.9
 MAINTAINER brian@projectweekend.net
 RUN apt-get update && apt-get -y install libxml2-dev libxslt-dev libjpeg-dev zlib1g-dev libpng12-dev
 ADD . /src/
