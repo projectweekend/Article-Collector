@@ -1,22 +1,23 @@
+import sys
 import pika
 import json
 
 
 class Publisher(object):
-    EXCHANGE = 'message'
-    EXCHANGE_TYPE = 'direct'
-    PUBLISH_INTERVAL = 1
 
-    def __init__(self, amqp_url, queue, routing_key, article_urls):
+    def __init__(self, rabbit_url, publish_interval, article_urls):
         self._connection = None
         self._channel = None
         self._deliveries = []
         self._message_number = 0
         self._stopping = False
-        self._url = amqp_url
-        self._queue = queue
+        self._publish_interval = publish_interval
+        self._url = rabbit_url
+        self._exchange = 'article_collector'
+        self._exchange_type = 'direct'
+        self._queue = 'articles'
+        self._routing_key = 'articles'
         self._article_urls = article_urls
-        self._routing_key = routing_key
         self._closing = False
 
     def connect(self):
@@ -58,13 +59,13 @@ class Publisher(object):
     def on_channel_open(self, channel):
         self._channel = channel
         self.add_on_channel_close_callback()
-        self.setup_exchange(self.EXCHANGE)
+        self.setup_exchange(self._exchange)
 
     def setup_exchange(self, exchange_name):
         self._channel.exchange_declare(
             self.on_exchange_declareok,
             exchange_name,
-            self.EXCHANGE_TYPE)
+            self._exchange_type)
 
     def on_exchange_declareok(self, unused_frame):
         self.setup_queue(self._queue)
@@ -76,7 +77,7 @@ class Publisher(object):
         self._channel.queue_bind(
             self.on_bindok,
             self._queue,
-            self.EXCHANGE,
+            self._exchange,
             self._routing_key)
 
     def on_delivery_confirmation(self, method_frame):
@@ -89,12 +90,18 @@ class Publisher(object):
         if self._stopping:
             return
 
+        try:
+            url = self._article_urls.pop()
+        except IndexError:
+            self.stop()
+            sys.exit(0)
+
         message = json.dumps({
-            'url': self._article_urls.pop()
+            'url': url
         })
 
         self._channel.basic_publish(
-            self.EXCHANGE,
+            self._exchange,
             self._routing_key,
             message)
         self._message_number += 1
@@ -104,7 +111,7 @@ class Publisher(object):
     def schedule_next_message(self):
         if self._stopping:
             return
-        self._connection.add_timeout(self.PUBLISH_INTERVAL, self.publish_message)
+        self._connection.add_timeout(self._publish_interval, self.publish_message)
 
     def start_publishing(self):
         self.enable_delivery_confirmations()
