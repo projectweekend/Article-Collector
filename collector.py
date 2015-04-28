@@ -1,16 +1,37 @@
+import sys
 import yaml
 import newspaper
-from rabbit.publisher import Publisher
+from rabbit import Publisher
+
+
+def parse_config():
+    try:
+        with open('./config.yml') as file:
+            config = yaml.safe_load(file)
+    except IOError:
+        print("No volume mounted with file 'config.yml'")
+        sys.exit(1)
+    try:
+        source_url = config['source']
+    except KeyError:
+        print("'source' property is missing in 'config.yml'")
+        sys.exit(1)
+    try:
+        rabbit_url = config['rabbit_url']
+    except KeyError:
+        print("'rabbit_url' property is missing in 'config.yml'")
+        sys.exit(1)
+
+    return (source_url, rabbit_url, )
 
 
 def main():
-    with open('/options/config.yml') as file:
-        config = yaml.safe_load(file)
-    paper = newspaper.build(config['source'])
+    source_url, rabbit_url = parse_config()
+    paper = newspaper.build(source_url)
     publisher = Publisher(
-        rabbit_url=config['rabbit_url'],
-        publish_interval=1,
-        article_urls=paper.articles)
+        rabbit_url=rabbit_url,
+        publish_interval=0.25,
+        article_urls=paper.article_urls())
     publisher.run()
 
 
